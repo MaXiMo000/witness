@@ -17,7 +17,24 @@ behavior.
 Full pitch and reasoning: see the conversation this was scoped in, or
 `README.md` once it's fleshed out further.
 
-## Status as of 2026-09-08 (initial scaffold, not yet run in a real browser)
+## Status as of 2026-09-08: verified working, scope decided
+
+Loaded unpacked in a real Chrome. `maximo000.github.io/carabiner/` reads a
+real `PASS` (observed `fonts.googleapis.com`/`fonts.gstatic.com`, matched
+the allow-list); an unclaimed site reads real `UNVERIFIED`. Toolbar badge
+(OK/FAIL/? on the icon, via `chrome.action.setBadgeText`) and a dark-mode
+popup with unexpected-domain highlighting are in.
+
+**Scope decided:** witness stays scoped to domains I personally own and
+write a claims file for. It is not going to grow into a general tracker
+scanner for arbitrary sites (YouTube, LinkedIn, etc.) — that's what
+uBlock/Ghostery/Privacy Badger already do with EasyPrivacy, no reason to
+rebuild it, and it would dilute the actual idea (checking a site's own
+stated claim against its own behavior, not flagging generic trackers).
+Every site without a claims file correctly reads `UNVERIFIED` forever,
+by design.
+
+## Original scaffold notes (2026-09-08, pre-verification)
 
 **Built and verified:**
 - `diff.js` -- the pure comparison logic (claims vs. observed domains).
@@ -92,16 +109,16 @@ browsing for your own use, with no publication involved.
 
 ## Next session, in order
 
-1. Load the extension unpacked in a real browser (step 1 above). This is
-   the actual "does it work" test -- everything until now is Node-testable
-   logic and JSON validity, not the extension.
-2. Fix whatever that first real load surfaces (service worker registration
-   errors, storage API quirks, popup rendering issues -- there will be
-   something; there always is on a first real run).
-3. Once `maximo000.github.io` reads as a clean real PASS in a real popup,
-   add a toolbar badge so status is visible without opening the popup.
-4. Only then: decide, deliberately, whether/which real third-party site to
-   add a claims file for, with the care described above.
-5. `git init`/GitHub repo already done as part of the initial scaffold --
-   push each real step as its own commit, same pattern as the other repos
-   in this account.
+Steps 1-4 from the original plan are done (real browser load, badge,
+scope decision). What's left is optional polish, not required for the
+tool to be "working":
+
+1. A real icon (`action.default_icon`) instead of Chrome's default
+   puzzle-piece placeholder -- purely cosmetic, do it if it bugs you.
+2. If a second site of mine ever gets its own `policies/<domain>.json`
+   (e.g. another GitHub Pages project with different third parties),
+   confirm the badge and popup both handle multiple claims files fine --
+   the code already supports it (`policies/<domain>.json` is looked up by
+   the actual page domain), just untested with more than one file.
+3. No Chrome Web Store listing planned -- this is a personal-use tool, not
+   a published extension.

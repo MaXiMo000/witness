@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <title>witness</title>
 <style>
-  body { width: 320px; margin: 0; padding: 14px; font: 13px/1.5 -apple-system, system-ui, sans-serif; color: #1a1a1a; }
-  h1 { font-size: 14px; margin: 0 0 10px; }
+  :root { color-scheme: light dark; }
+  body { width: 320px; margin: 0; padding: 14px; font: 13px/1.5 -apple-system, system-ui, sans-serif; color: #1a1a1a; background: #fff; }
+  h1 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; }
   #domain { color: #666; margin-bottom: 8px; word-break: break-all; }
   #status { padding: 8px 10px; border-radius: 4px; font-weight: 600; margin-bottom: 10px; }
   #status.pass { background: #e6f4ea; color: #1e7a34; }
@@ -13,10 +14,24 @@
   #status.unverified { background: #fff4e5; color: #966a00; }
   #observed { margin: 0; padding-left: 18px; font-family: ui-monospace, monospace; font-size: 12px; color: #444; }
   #observed:empty::before { content: "no third-party requests observed yet"; font-family: inherit; color: #999; }
+  #observed li.unexpected { color: #b3261e; font-weight: 600; }
+  #observed li.unexpected::after { content: " — not in allow-list"; font-weight: 400; color: #b3261e; opacity: 0.8; }
+
+  @media (prefers-color-scheme: dark) {
+    body { color: #e8e8e8; background: #1e1e1e; }
+    #domain { color: #999; }
+    #status.pass { background: #16321f; color: #6fcf8b; }
+    #status.fail { background: #3a1a17; color: #ff8a80; }
+    #status.unverified { background: #3a2e0f; color: #ffcc66; }
+    #observed { color: #bbb; }
+    #observed:empty::before { color: #777; }
+    #observed li.unexpected { color: #ff8a80; }
+    #observed li.unexpected::after { color: #ff8a80; }
+  }
 </style>
 </head>
 <body>
-  <h1>witness</h1>
+  <h1>🔍 witness</h1>
   <div id="domain"></div>
   <div id="status">checking…</div>
   <ul id="observed"></ul>

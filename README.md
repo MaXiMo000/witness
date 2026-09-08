@@ -28,14 +28,26 @@ FAIL — claims no third-party trackers, but contacted: ads.example.net
 - `diff.js` — pure, dependency-free comparison logic, unit tested with
   Node's built-in test runner — compares the two and reports the verdict.
 
+## Scope
+
+witness is a personal transparency badge for sites I own, not a general web
+privacy scanner. It only ever knows about domains that have a
+`policies/<domain>.json` file I wrote myself, sourced from the site's own
+published claims. Every other site — YouTube, LinkedIn, anything I haven't
+personally reviewed — correctly reads `UNVERIFIED`, not a bug. Broad
+tracker detection across arbitrary sites is already a solved problem
+(uBlock/Ghostery/Privacy Badger, built on EasyPrivacy); witness isn't
+trying to replace that. Its job is narrower: prove a specific claim about a
+specific site I control actually holds.
+
 ## Status
 
-**Early scaffold, not yet run in a real browser.** The comparison logic is
-real and tested (`node --test`); the extension itself (manifest, service
-worker, popup) is written and syntax-checked but has never been loaded into
-an actual browser from this environment. See `PLAN.md` for exactly what's
-verified, what isn't, and the next concrete steps — read that before
-building on this further.
+**Verified working, in a real browser.** Loaded unpacked in Chrome,
+confirmed a real `PASS` against `maximo000.github.io/carabiner/` (observed
+`fonts.googleapis.com` / `fonts.gstatic.com`, matched the declared
+allow-list) and a real `UNVERIFIED` on a site with no claims file. Toolbar
+badge (OK/FAIL/?) and dark-mode popup styling are in. See `PLAN.md` for the
+full history and what's still open.
 
 ## Try the logic
 
@@ -52,10 +64,10 @@ chrome://extensions → Developer mode → Load unpacked → select this folder
 Then visit a page under a domain with a `policies/<domain>.json` file (a
 real one already exists for `maximo000.github.io`) and open the popup.
 
-## What's deliberately not here yet
+## What's deliberately not here
 
-No icon, no toolbar badge, no packaging, no claims file for any domain I
-don't personally control. That last one is a judgment call, not a coding
-task — see "Before naming a real company" in `PLAN.md`.
+No icon, no packaging, no Chrome Web Store listing, no claims file for any
+domain I don't personally control — that last one isn't a TODO, it's the
+scope (see above).
 
 MIT licensed.

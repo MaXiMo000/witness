@@ -36,11 +36,13 @@ function render(result, domain, thirdParty) {
   statusEl.textContent = `${result.status.toUpperCase()} — ${result.detail}`;
   statusEl.className = result.status;
 
+  const unexpected = new Set(result.unexpected);
   const list = document.getElementById("observed");
   list.innerHTML = "";
   for (const d of thirdParty) {
     const li = document.createElement("li");
     li.textContent = d;
+    if (unexpected.has(d)) li.className = "unexpected";
     list.appendChild(li);
   }
 }

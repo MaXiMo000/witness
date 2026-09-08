@@ -10,6 +10,35 @@
  * a variable would silently reset mid-page-load and undercount domains.
  */
 
+importScripts("diff.js"); // shares WitnessDiff.check/thirdPartyDomains with popup.js
+
+const BADGE = {
+  pass: ["OK", "#2e7d32"],
+  fail: ["FAIL", "#c62828"],
+  unverified: ["?", "#757575"],
+};
+
+// ponytail: badge is computed once when the page finishes loading, not live
+// on every later request, and not on client-side (SPA) route changes --
+// good enough to glance at without opening the popup for the static sites
+// witness currently checks. Add a webNavigation.onHistoryStateUpdated
+// listener if a future claims file targets an SPA.
+async function updateBadge(tabId, pageDomain, domains) {
+  let claims = null;
+  try {
+    const res = await fetch(chrome.runtime.getURL(`policies/${pageDomain}.json`));
+    if (res.ok) claims = await res.json();
+  } catch {
+    // no bundled claims file for this domain -- badge reads unverified
+  }
+
+  const thirdParty = WitnessDiff.thirdPartyDomains(pageDomain, domains);
+  const { status } = WitnessDiff.check(claims, thirdParty);
+  const [text, color] = BADGE[status];
+  chrome.action.setBadgeText({ tabId, text });
+  chrome.action.setBadgeBackgroundColor({ tabId, color });
+}
+
 function hostOf(url) {
   try {
     return new URL(url).hostname;
@@ -34,6 +63,13 @@ async function setTabState(tabId, state) {
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
   if (details.frameId !== 0) return; // top-level frame only, not iframes
   setTabState(details.tabId, { pageDomain: hostOf(details.url), domains: [] });
+  chrome.action.setBadgeText({ tabId: details.tabId, text: "" }); // clear stale status while loading
+});
+
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+  const state = await getTabState(details.tabId);
+  if (state.pageDomain) updateBadge(details.tabId, state.pageDomain, state.domains);
 });
 
 chrome.webRequest.onBeforeRequest.addListener(
