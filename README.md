@@ -40,6 +40,17 @@ tracker detection across arbitrary sites is already a solved problem
 trying to replace that. Its job is narrower: prove a specific claim about a
 specific site I control actually holds.
 
+**"Sites I own" is a curation discipline, not something the code enforces.**
+`manifest.json` requests `<all_urls>`, and nothing in `background.js` or
+`popup.js` checks a policy file's domain against a list of domains I
+actually own before computing and rendering a verdict for it — the only
+thing keeping this scoped today is that every file under `policies/` is
+one I wrote and sourced myself, per `policies/SCHEMA.md`. If that ever
+changes (a contributor's PR, a moment of enthusiasm adding a domain I
+don't control), the extension would compute a real-looking PASS/FAIL for
+it exactly as if I did. Read every claim here as "sourced and reviewed by
+one person," not as a property the software guarantees.
+
 ## Status
 
 **Verified working, in a real browser.** Loaded unpacked in Chrome,
