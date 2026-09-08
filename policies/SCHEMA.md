@@ -30,5 +30,12 @@ This is the part that needs a person, not automation: reading an actual
 privacy policy and writing down what it actually promises is a judgment
 call, and getting it wrong before publishing a "this site contradicts
 itself" finding about a real company is a real reputational and factual
-risk. See PLAN.md's "Before naming a real company" section before adding
-one of these for anywhere you don't personally control.
+risk, not a bug. Before adding a `policies/<real-company-domain>.json` for
+anywhere you don't personally control:
+
+- Quote the exact policy language the claim is based on in `source`, with
+  a link, so the claim is checkable by someone else, not just asserted.
+- Phrase findings as an observed discrepancy ("contacted X, which isn't in
+  the declared allow-list"), never as an accusation of bad faith ("this
+  site is lying"). Keep any future UI wording consistent with `diff.js`,
+  which already does this.

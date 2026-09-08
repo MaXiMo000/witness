@@ -46,8 +46,7 @@ specific site I control actually holds.
 confirmed a real `PASS` against `maximo000.github.io/carabiner/` (observed
 `fonts.googleapis.com` / `fonts.gstatic.com`, matched the declared
 allow-list) and a real `UNVERIFIED` on a site with no claims file. Toolbar
-badge (OK/FAIL/?) and dark-mode popup styling are in. See `PLAN.md` for the
-full history and what's still open.
+badge (OK/FAIL/?) and dark-mode popup styling are in.
 
 ## Try the logic
 
