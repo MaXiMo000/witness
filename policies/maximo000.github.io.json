@@ -1,0 +1,9 @@
+{
+  "domain": "maximo000.github.io",
+  "claims": {
+    "no_third_party_trackers": true
+  },
+  "allowed_third_party_domains": ["fonts.googleapis.com", "fonts.gstatic.com"],
+  "source": "self-declared: static GitHub Pages sites (portfolio, firedrill, carabiner, invariant docs) with no analytics, no ads, only Google Fonts",
+  "checked_at": "2026-09-08"
+}

@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>witness</title>
+<style>
+  body { width: 320px; margin: 0; padding: 14px; font: 13px/1.5 -apple-system, system-ui, sans-serif; color: #1a1a1a; }
+  h1 { font-size: 14px; margin: 0 0 10px; }
+  #domain { color: #666; margin-bottom: 8px; word-break: break-all; }
+  #status { padding: 8px 10px; border-radius: 4px; font-weight: 600; margin-bottom: 10px; }
+  #status.pass { background: #e6f4ea; color: #1e7a34; }
+  #status.fail { background: #fce8e6; color: #b3261e; }
+  #status.unverified { background: #fff4e5; color: #966a00; }
+  #observed { margin: 0; padding-left: 18px; font-family: ui-monospace, monospace; font-size: 12px; color: #444; }
+  #observed:empty::before { content: "no third-party requests observed yet"; font-family: inherit; color: #999; }
+</style>
+</head>
+<body>
+  <h1>witness</h1>
+  <div id="domain"></div>
+  <div id="status">checking…</div>
+  <ul id="observed"></ul>
+  <script src="diff.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

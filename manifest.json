@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "witness",
+  "version": "0.1.0",
+  "description": "Watches what a site actually does, and checks it against what it claims to do.",
+  "permissions": ["webRequest", "webNavigation", "storage", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
