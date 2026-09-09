@@ -10,7 +10,7 @@
  * a variable would silently reset mid-page-load and undercount domains.
  */
 
-importScripts("diff.js"); // shares WitnessDiff.check/thirdPartyDomains with popup.js
+importScripts("diff.js", "claims.js"); // shared with popup.js
 
 const BADGE = {
   pass: ["OK", "#2e7d32"],
@@ -24,14 +24,7 @@ const BADGE = {
 // witness currently checks. Add a webNavigation.onHistoryStateUpdated
 // listener if a future claims file targets an SPA.
 async function updateBadge(tabId, pageDomain, domains) {
-  let claims = null;
-  try {
-    const res = await fetch(chrome.runtime.getURL(`policies/${pageDomain}.json`));
-    if (res.ok) claims = await res.json();
-  } catch {
-    // no bundled claims file for this domain -- badge reads unverified
-  }
-
+  const claims = await loadOwnedClaims(pageDomain);
   const thirdParty = WitnessDiff.thirdPartyDomains(pageDomain, domains);
   const { status } = WitnessDiff.check(claims, thirdParty);
   const [text, color] = BADGE[status];

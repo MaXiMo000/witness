@@ -45,8 +45,20 @@ function check(claims, observedDomains) {
   return { status: "fail", detail, unexpected };
 }
 
+/**
+ * Whether `domain` is on the list of sites actually reviewed and owned --
+ * the code-level half of the "sites I own" scope README.md documents. A
+ * policy file existing under policies/ is not, by itself, proof of that;
+ * anyone could add one. `ownedList` is policies/owned.json, the one file a
+ * PR adding a new domain has to touch alongside the policy file itself.
+ */
+function isOwned(ownedList, domain) {
+  const target = stripWww(domain);
+  return Array.isArray(ownedList) && ownedList.some((d) => stripWww(d) === target);
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { check, thirdPartyDomains, stripWww };
+  module.exports = { check, thirdPartyDomains, stripWww, isOwned };
 } else {
-  self.WitnessDiff = { check, thirdPartyDomains, stripWww };
+  self.WitnessDiff = { check, thirdPartyDomains, stripWww, isOwned };
 }

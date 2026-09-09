@@ -3,7 +3,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { check, thirdPartyDomains, stripWww } = require("../diff.js");
+const { check, thirdPartyDomains, stripWww, isOwned } = require("../diff.js");
 
 test("no claims file -> unverified, never a false pass or fail", () => {
   const result = check(null, ["ads.example"]);
@@ -39,4 +39,60 @@ test("stripWww only strips a leading www.", () => {
   assert.equal(stripWww("www.example.com"), "example.com");
   assert.equal(stripWww("wwwexample.com"), "wwwexample.com");
   assert.equal(stripWww("static.example.com"), "static.example.com");
+});
+
+test("isOwned: a domain on the list is owned, www.-insensitively", () => {
+  assert.equal(isOwned(["maximo000.github.io"], "maximo000.github.io"), true);
+  assert.equal(isOwned(["maximo000.github.io"], "www.maximo000.github.io"), true);
+  assert.equal(isOwned(["www.maximo000.github.io"], "maximo000.github.io"), true);
+});
+
+test("isOwned: a policy file existing is not the same as being on the list", () => {
+  assert.equal(isOwned(["maximo000.github.io"], "evil.example.com"), false);
+});
+
+test("isOwned: fails closed on a missing or malformed owned list", () => {
+  assert.equal(isOwned([], "maximo000.github.io"), false);
+  assert.equal(isOwned(null, "maximo000.github.io"), false);
+  assert.equal(isOwned(undefined, "maximo000.github.io"), false);
+});
+
+test("loadOwnedClaims: an owned domain with a policy file returns it", async () => {
+  const { loadOwnedClaims } = require("../claims.js");
+  global.chrome = { runtime: { getURL: (p) => p } };
+  const files = {
+    "policies/owned.json": ["example.com"],
+    "policies/example.com.json": { allowed_third_party_domains: ["cdn.example.net"] },
+  };
+  global.fetch = async (url) =>
+    url in files
+      ? { ok: true, json: async () => files[url] }
+      : { ok: false };
+  try {
+    const claims = await loadOwnedClaims("example.com");
+    assert.deepEqual(claims, files["policies/example.com.json"]);
+  } finally {
+    delete global.chrome;
+    delete global.fetch;
+  }
+});
+
+test("loadOwnedClaims: a real policy file for an unowned domain is never returned", async () => {
+  const { loadOwnedClaims } = require("../claims.js");
+  global.chrome = { runtime: { getURL: (p) => p } };
+  const files = {
+    "policies/owned.json": ["example.com"], // does not list evil.example.com
+    "policies/evil.example.com.json": { allowed_third_party_domains: [] },
+  };
+  global.fetch = async (url) =>
+    url in files
+      ? { ok: true, json: async () => files[url] }
+      : { ok: false };
+  try {
+    const claims = await loadOwnedClaims("evil.example.com");
+    assert.equal(claims, null, "a policy file existing must not be enough on its own");
+  } finally {
+    delete global.chrome;
+    delete global.fetch;
+  }
 });

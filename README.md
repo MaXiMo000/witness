@@ -24,9 +24,15 @@ FAIL — claims no third-party trackers, but contacted: ads.example.net
   open (domains only — no bodies, no headers beyond the URL) and keeps a
   running list of distinct third-party domains contacted.
 - A `policies/<domain>.json` file declares what a domain is allowed to
-  contact. See `policies/SCHEMA.md`.
+  contact. See `policies/SCHEMA.md`. `policies/owned.json` lists which
+  domains a policy file is actually trusted for — see Scope, below.
 - `diff.js` — pure, dependency-free comparison logic, unit tested with
   Node's built-in test runner — compares the two and reports the verdict.
+- `claims.js` — the fetch orchestration `background.js` and `popup.js`
+  share (load `owned.json`, check it, then load the domain's policy file).
+  Kept out of `diff.js` so the pass/fail logic stays pure and Node-testable;
+  this needs `chrome.runtime.getURL` and `fetch`, which only exist in the
+  extension itself.
 
 ## Scope
 
@@ -40,24 +46,36 @@ tracker detection across arbitrary sites is already a solved problem
 trying to replace that. Its job is narrower: prove a specific claim about a
 specific site I control actually holds.
 
-**"Sites I own" is a curation discipline, not something the code enforces.**
-`manifest.json` requests `<all_urls>`, and nothing in `background.js` or
-`popup.js` checks a policy file's domain against a list of domains I
-actually own before computing and rendering a verdict for it — the only
-thing keeping this scoped today is that every file under `policies/` is
-one I wrote and sourced myself, per `policies/SCHEMA.md`. If that ever
-changes (a contributor's PR, a moment of enthusiasm adding a domain I
-don't control), the extension would compute a real-looking PASS/FAIL for
-it exactly as if I did. Read every claim here as "sourced and reviewed by
-one person," not as a property the software guarantees.
+**"Sites I own" is now checked in code, not just curation.**
+`policies/owned.json` is the list; `claims.js:loadOwnedClaims()` checks a
+domain against it before a `policies/<domain>.json` file for that domain is
+ever read, in both `background.js` and `popup.js` — a policy file existing
+is no longer enough on its own, on purpose (`test/diff.test.js` asserts
+exactly that: a real claims file for a domain not on the list is never
+returned). This raises the bar from "nothing stops it" to "two files have
+to agree, and the diff that adds one without the other is visible in
+review" — it does not make the claim cryptographic or the domain's actual
+ownership verifiable, and `manifest.json` still requests `<all_urls>`
+because the extension has to be able to *observe* traffic on a site before
+it can ever tell you whether that site is on the owned list to begin with.
+Read every claim here as "sourced and reviewed by one person, and the tool
+now refuses to render a verdict for anything that reviewer didn't also add
+to the owned list" — still not a property the software can prove from
+first principles, just one more thing that has to go wrong at once.
 
 ## Status
 
-**Verified working, in a real browser.** Loaded unpacked in Chrome,
-confirmed a real `PASS` against `maximo000.github.io/carabiner/` (observed
-`fonts.googleapis.com` / `fonts.gstatic.com`, matched the declared
-allow-list) and a real `UNVERIFIED` on a site with no claims file. Toolbar
-badge (OK/FAIL/?) and dark-mode popup styling are in.
+**Verified working, in a real browser** (as of the initial scaffold).
+Loaded unpacked in Chrome, confirmed a real `PASS` against
+`maximo000.github.io/carabiner/` (observed `fonts.googleapis.com` /
+`fonts.gstatic.com`, matched the declared allow-list) and a real
+`UNVERIFIED` on a site with no claims file. Toolbar badge (OK/FAIL/?) and
+dark-mode popup styling are in. The owned-list gate, the popup's top-level
+error handling, and CI were added and covered by `node --test` (13 tests,
+including two that load the real `popup.js` with fake `chrome`/`document`
+globals and check what it actually rendered) in a session that could not
+reach a real Chrome instance to re-confirm end-to-end — load-unpacked and
+click through before trusting this beyond what the tests already pin down.
 
 ## Try the logic
 
