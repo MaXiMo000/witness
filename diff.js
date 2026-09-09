@@ -107,8 +107,32 @@ function isOwned(ownedList, domain) {
   return Array.isArray(ownedList) && ownedList.some((d) => stripWww(d) === target);
 }
 
+/**
+ * The code-enforced half of SCHEMA.md's "Filling one in for a real, named
+ * third party" guidance -- a policy for a domain you don't own is only
+ * ever loaded if its own `source` field looks like it actually cites
+ * something: a real link, and either a quoted phrase or enough prose that
+ * it isn't just a bare assertion. This can't verify the quote is genuine
+ * -- no code can -- it only refuses the one failure mode a computer
+ * *can* catch: a "reviewed" entry with no citation in it at all. The
+ * human judgment SCHEMA.md asks for (is this actually what the policy
+ * says, quoted correctly) still has to happen before the file is ever
+ * written; this is a floor under that, not a replacement for it.
+ */
+function isValidReviewedClaims(claims) {
+  if (!claims || typeof claims.source !== "string") return false;
+  const source = claims.source;
+  const hasLink = /https?:\/\//.test(source);
+  const hasQuoteOrSubstance = /["“‘’]/.test(source) || source.length >= 40;
+  return hasLink && hasQuoteOrSubstance;
+}
+
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned };
+  module.exports = {
+    check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned, isValidReviewedClaims,
+  };
 } else {
-  self.WitnessDiff = { check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned };
+  self.WitnessDiff = {
+    check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned, isValidReviewedClaims,
+  };
 }

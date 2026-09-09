@@ -17,12 +17,13 @@ async function main() {
   // A claims file bundled with the extension itself for now (policies/).
   // Fetching a domain's own claims from *itself* would defeat the point --
   // a site can't be trusted to self-report the thing being checked.
-  const claims = await loadOwnedClaims(pageDomain);
+  const loaded = await loadClaims(pageDomain);
 
   const thirdParty = WitnessDiff.thirdPartyDomains(pageDomain, state.domains);
   const cookieDomains = WitnessDiff.thirdPartyDomains(pageDomain, state.cookieDomains || []);
-  const result = WitnessDiff.check(claims, thirdParty, { cookieDomains, pageHeaders: state.pageHeaders });
-  render(result, pageDomain, thirdParty);
+  const result = WitnessDiff.check(loaded?.claims ?? null, thirdParty,
+    { cookieDomains, pageHeaders: state.pageHeaders });
+  render(result, pageDomain, thirdParty, loaded?.tier ?? null);
   renderHistory(await loadHistory(pageDomain));
 }
 
@@ -40,11 +41,25 @@ main().catch((err) => {
   render({ status: "unverified", detail: `witness hit an internal error: ${err.message}`, unexpected: [] }, "", []);
 });
 
-function render(result, domain, thirdParty) {
+// Shown once, distinct from the pass/fail verdict itself: a reader should
+// be able to tell "the operator says this about their own site" from "a
+// reviewer sourced this from the company's public policy" without reading
+// SCHEMA.md -- the two carry different epistemic weight, and collapsing
+// them into one undifferentiated claim would overstate the third-party
+// case and undersell the owned one.
+const TIER_LABEL = {
+  owned: "self-declared — a site you operate",
+  reviewed: "third-party claim — reviewed and sourced, not your own site",
+};
+
+function render(result, domain, thirdParty, tier) {
   document.getElementById("domain").textContent = domain;
   const statusEl = document.getElementById("status");
   statusEl.textContent = `${result.status.toUpperCase()} — ${result.detail}`;
   statusEl.className = result.status;
+
+  const tierEl = document.getElementById("tier");
+  if (tierEl) tierEl.textContent = tier ? TIER_LABEL[tier] : "";
 
   const unexpected = new Set(result.unexpected);
   const list = document.getElementById("observed");

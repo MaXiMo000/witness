@@ -40,10 +40,11 @@ async function recordHistory(domain, result) {
 // witness currently checks. Add a webNavigation.onHistoryStateUpdated
 // listener if a future claims file targets an SPA.
 async function updateBadge(tabId, pageDomain, state) {
-  const claims = await loadOwnedClaims(pageDomain);
+  const loaded = await loadClaims(pageDomain);
   const thirdParty = WitnessDiff.thirdPartyDomains(pageDomain, state.domains);
   const cookieDomains = WitnessDiff.thirdPartyDomains(pageDomain, state.cookieDomains);
-  const result = WitnessDiff.check(claims, thirdParty, { cookieDomains, pageHeaders: state.pageHeaders });
+  const result = WitnessDiff.check(loaded?.claims ?? null, thirdParty,
+    { cookieDomains, pageHeaders: state.pageHeaders });
   const [text, color] = BADGE[result.status];
   chrome.action.setBadgeText({ tabId, text });
   chrome.action.setBadgeBackgroundColor({ tabId, color });

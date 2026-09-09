@@ -46,32 +46,40 @@ FAIL — claims no third-party trackers, but contacted: ads.example.net
 
 ## Scope
 
-witness is a personal transparency badge for sites I own, not a general web
-privacy scanner. It only ever knows about domains that have a
-`policies/<domain>.json` file I wrote myself, sourced from the site's own
-published claims. Every other site — YouTube, LinkedIn, anything I haven't
-personally reviewed — correctly reads `UNVERIFIED`, not a bug. Broad
-tracker detection across arbitrary sites is already a solved problem
-(uBlock/Ghostery/Privacy Badger, built on EasyPrivacy); witness isn't
-trying to replace that. Its job is narrower: prove a specific claim about a
-specific site I control actually holds.
+witness is a personal transparency badge, not a general web privacy
+scanner. It only ever knows about domains that have a
+`policies/<domain>.json` file, and only ever renders a verdict for one if
+that domain is also on one of two explicit lists — every other site
+(YouTube, LinkedIn, anything nobody has reviewed) correctly reads
+`UNVERIFIED`, not a bug. Broad tracker detection across arbitrary sites is
+already a solved problem (uBlock/Ghostery/Privacy Badger, built on
+EasyPrivacy); witness isn't trying to replace that. Its job is narrower:
+prove a specific, sourced claim about a specific site actually holds.
 
-**"Sites I own" is now checked in code, not just curation.**
-`policies/owned.json` is the list; `claims.js:loadOwnedClaims()` checks a
-domain against it before a `policies/<domain>.json` file for that domain is
-ever read, in both `background.js` and `popup.js` — a policy file existing
-is no longer enough on its own, on purpose (`test/diff.test.js` asserts
-exactly that: a real claims file for a domain not on the list is never
-returned). This raises the bar from "nothing stops it" to "two files have
-to agree, and the diff that adds one without the other is visible in
-review" — it does not make the claim cryptographic or the domain's actual
-ownership verifiable, and `manifest.json` still requests `<all_urls>`
-because the extension has to be able to *observe* traffic on a site before
-it can ever tell you whether that site is on the owned list to begin with.
-Read every claim here as "sourced and reviewed by one person, and the tool
-now refuses to render a verdict for anything that reviewer didn't also add
-to the owned list" — still not a property the software can prove from
-first principles, just one more thing that has to go wrong at once.
+**Two tiers, both checked in code, not just curation.** `policies/owned.json`
+lists sites I operate myself, where a claim is a self-declared statement of
+fact. `policies/reviewed.json` (ships empty) lists real, named third
+parties I don't own but have carefully reviewed — see
+`policies/SCHEMA.md`'s "Filling one in for a real, named third party" for
+the sourcing discipline that requires, and its "Two tiers" section for what
+`claims.js:loadClaims()` actually enforces: a reviewed domain's claims file
+additionally has to clear `isValidReviewedClaims()` — a real citation
+(a link, plus a quote or real prose) has to be *present in the file*, or it
+reads `unverified` exactly like no file existing at all. This can't verify
+a citation is genuine, only that one exists — the human judgment of
+actually getting the claim right still has to happen before the file is
+written; see SCHEMA.md.
+
+Neither list makes a claim cryptographic or ownership verifiable, and
+`manifest.json` still requests `<all_urls>` because the extension has to be
+able to *observe* traffic on a site before it can ever tell you whether
+that site is on either list to begin with. Read every claim here as
+"sourced and reviewed by one person, and the tool refuses to render a
+verdict for anything that reviewer didn't also list and (for a third
+party) properly cite" — still not a property the software can prove from
+first principles, just one more thing that has to go wrong at once. The
+popup labels which tier a rendered claim came from, so that distinction is
+never left for the reader to guess at.
 
 ## Status
 
@@ -83,8 +91,9 @@ Loaded unpacked in Chrome, confirmed a real `PASS` against
 dark-mode popup styling are in.
 
 Everything added since — the owned-list gate, the popup's top-level error
-handling, persisted verdict history, and cookie/header claims — is covered
-by `node --test` (25 tests, including several that load the real
+handling, persisted verdict history, cookie/header claims, and the
+reviewed-third-party tier — is covered by `node --test` (35 tests,
+including several that load the real
 `popup.js`/`diff.js` with fake `chrome`/`document` globals and check what
 they actually rendered or decided) but **not re-confirmed end-to-end in a
 real Chrome instance** — every session since the initial scaffold has hit a
@@ -113,8 +122,10 @@ real one already exists for `maximo000.github.io`) and open the popup.
 
 ## What's deliberately not here
 
-No icon, no packaging, no Chrome Web Store listing, no claims file for any
-domain I don't personally control — that last one isn't a TODO, it's the
-scope (see above).
+No icon, no packaging, no Chrome Web Store listing. `policies/reviewed.json`
+(claims for a real, named third party — see Scope) ships empty: the
+mechanism and its sourcing bar are built and tested, but adding the first
+real one is a deliberate, one-at-a-time human decision, not something to
+batch or automate — not a TODO, the scope.
 
 MIT licensed.

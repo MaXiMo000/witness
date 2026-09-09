@@ -39,6 +39,31 @@ bare domain).
 - All three checks (traffic, cookies, headers) fail closed independently:
   the first one that finds a discrepancy is what the popup reports.
 
+## Two tiers, checked in code, not just by curation
+
+A policy file's domain has to be on one of two lists, or it's never
+loaded at all -- a file existing under `policies/` is not, by itself,
+proof of anything:
+
+- **`policies/owned.json`** -- sites you operate. The claim is a
+  self-declared statement of fact about your own infrastructure.
+- **`policies/reviewed.json`** -- real, named third parties you do
+  *not* own, reviewed carefully per the section below. These get an
+  *additional*, code-enforced bar: `claims.js:loadClaims()` calls
+  `isValidReviewedClaims()` on the loaded file, and refuses it --
+  reads `unverified`, exactly like no file existing -- unless `source`
+  contains something that actually looks like a citation (a real
+  `http(s)://` link, plus either a quoted phrase or enough prose that
+  it isn't a bare assertion). This can't verify a quote is *genuine* --
+  no code can -- it only refuses the one failure mode a computer
+  actually can catch: a third-party claim with no citation in it at
+  all. `owned` entries aren't held to this bar; a fact about your own
+  site doesn't need a link to itself.
+
+The popup labels which tier a rendered claim came from, so a reader
+never has to guess whether they're looking at an operator's own
+statement or an outside reviewer's sourced claim.
+
 ## Filling one in for a real, named third party
 
 This is the part that needs a person, not automation: reading an actual
@@ -46,11 +71,16 @@ privacy policy and writing down what it actually promises is a judgment
 call, and getting it wrong before publishing a "this site contradicts
 itself" finding about a real company is a real reputational and factual
 risk, not a bug. Before adding a `policies/<real-company-domain>.json` for
-anywhere you don't personally control:
+anywhere you don't personally control, **and adding that domain to
+`policies/reviewed.json`** (the file itself does nothing until the domain
+is listed there):
 
 - Quote the exact policy language the claim is based on in `source`, with
-  a link, so the claim is checkable by someone else, not just asserted.
+  a link, so the claim is checkable by someone else, not just asserted --
+  `isValidReviewedClaims()` enforces the shape of this, not that it's true.
 - Phrase findings as an observed discrepancy ("contacted X, which isn't in
   the declared allow-list"), never as an accusation of bad faith ("this
   site is lying"). Keep any future UI wording consistent with `diff.js`,
   which already does this.
+- `policies/reviewed.json` ships empty. Adding the first real entry is a
+  deliberate, one-at-a-time decision, not something to batch or automate.

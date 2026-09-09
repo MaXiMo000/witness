@@ -3,7 +3,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned } = require("../diff.js");
+const { check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned, isValidReviewedClaims } =
+  require("../diff.js");
 
 test("no claims file -> unverified, never a false pass or fail", () => {
   const result = check(null, ["ads.example"]);
@@ -57,11 +58,36 @@ test("isOwned: fails closed on a missing or malformed owned list", () => {
   assert.equal(isOwned(undefined, "maximo000.github.io"), false);
 });
 
-test("loadOwnedClaims: an owned domain with a policy file returns it", async () => {
-  const { loadOwnedClaims } = require("../claims.js");
+test("isValidReviewedClaims: a link plus a quoted phrase clears the bar", () => {
+  const claims = { source: 'Their policy says "no third-party trackers" -- https://example.com/privacy' };
+  assert.equal(isValidReviewedClaims(claims), true);
+});
+
+test("isValidReviewedClaims: a link plus enough prose (no quote marks) also clears it", () => {
+  const claims = { source: "Reviewed the published privacy policy at https://example.com/privacy on 2026-09-10" };
+  assert.equal(isValidReviewedClaims(claims), true);
+});
+
+test("isValidReviewedClaims: a bare assertion with no link is refused", () => {
+  assert.equal(isValidReviewedClaims({ source: "trust me, I checked" }), false);
+});
+
+test("isValidReviewedClaims: a link with no quote and too little prose is refused", () => {
+  assert.equal(isValidReviewedClaims({ source: "see https://example.com" }), false);
+});
+
+test("isValidReviewedClaims: a missing or non-string source is refused, not a crash", () => {
+  assert.equal(isValidReviewedClaims({}), false);
+  assert.equal(isValidReviewedClaims({ source: 42 }), false);
+  assert.equal(isValidReviewedClaims(null), false);
+});
+
+test("loadClaims: an owned domain with a policy file returns it, tagged 'owned'", async () => {
+  const { loadClaims } = require("../claims.js");
   global.chrome = { runtime: { getURL: (p) => p } };
   const files = {
     "policies/owned.json": ["example.com"],
+    "policies/reviewed.json": [],
     "policies/example.com.json": { allowed_third_party_domains: ["cdn.example.net"] },
   };
   global.fetch = async (url) =>
@@ -69,8 +95,8 @@ test("loadOwnedClaims: an owned domain with a policy file returns it", async () 
       ? { ok: true, json: async () => files[url] }
       : { ok: false };
   try {
-    const claims = await loadOwnedClaims("example.com");
-    assert.deepEqual(claims, files["policies/example.com.json"]);
+    const loaded = await loadClaims("example.com");
+    assert.deepEqual(loaded, { claims: files["policies/example.com.json"], tier: "owned" });
   } finally {
     delete global.chrome;
     delete global.fetch;
@@ -143,11 +169,12 @@ test("check: cookie and header claims both satisfied -> pass, same as before the
   assert.equal(result.status, "pass");
 });
 
-test("loadOwnedClaims: a real policy file for an unowned domain is never returned", async () => {
-  const { loadOwnedClaims } = require("../claims.js");
+test("loadClaims: a real policy file for a domain on neither list is never returned", async () => {
+  const { loadClaims } = require("../claims.js");
   global.chrome = { runtime: { getURL: (p) => p } };
   const files = {
     "policies/owned.json": ["example.com"], // does not list evil.example.com
+    "policies/reviewed.json": [],
     "policies/evil.example.com.json": { allowed_third_party_domains: [] },
   };
   global.fetch = async (url) =>
@@ -155,8 +182,74 @@ test("loadOwnedClaims: a real policy file for an unowned domain is never returne
       ? { ok: true, json: async () => files[url] }
       : { ok: false };
   try {
-    const claims = await loadOwnedClaims("evil.example.com");
-    assert.equal(claims, null, "a policy file existing must not be enough on its own");
+    const loaded = await loadClaims("evil.example.com");
+    assert.equal(loaded, null, "a policy file existing must not be enough on its own");
+  } finally {
+    delete global.chrome;
+    delete global.fetch;
+  }
+});
+
+test("loadClaims: a reviewed domain with a properly sourced claim returns it, tagged 'reviewed'", async () => {
+  const { loadClaims } = require("../claims.js");
+  global.chrome = { runtime: { getURL: (p) => p } };
+  const files = {
+    "policies/owned.json": [],
+    "policies/reviewed.json": ["thirdparty.example"],
+    "policies/thirdparty.example.json": {
+      allowed_third_party_domains: [],
+      source: 'Their privacy policy states "we do not use third-party trackers" -- https://thirdparty.example/privacy',
+    },
+  };
+  global.fetch = async (url) =>
+    url in files ? { ok: true, json: async () => files[url] } : { ok: false };
+  try {
+    const loaded = await loadClaims("thirdparty.example");
+    assert.deepEqual(loaded, { claims: files["policies/thirdparty.example.json"], tier: "reviewed" });
+  } finally {
+    delete global.chrome;
+    delete global.fetch;
+  }
+});
+
+test("loadClaims: a reviewed domain whose claims file has no real citation is refused", async () => {
+  const { loadClaims } = require("../claims.js");
+  global.chrome = { runtime: { getURL: (p) => p } };
+  const files = {
+    "policies/owned.json": [],
+    "policies/reviewed.json": ["thirdparty.example"],
+    // No link, no quote -- just an assertion. Exactly what
+    // isValidReviewedClaims exists to refuse.
+    "policies/thirdparty.example.json": { allowed_third_party_domains: [], source: "trust me" },
+  };
+  global.fetch = async (url) =>
+    url in files ? { ok: true, json: async () => files[url] } : { ok: false };
+  try {
+    const loaded = await loadClaims("thirdparty.example");
+    assert.equal(loaded, null, "an under-sourced third-party claim must fail closed, not load anyway");
+  } finally {
+    delete global.chrome;
+    delete global.fetch;
+  }
+});
+
+test("loadClaims: a domain on both lists reads as owned, not reviewed", async () => {
+  // Not a real scenario (a domain shouldn't be on both), but the lookup
+  // order is worth pinning explicitly: owned is checked first, so an
+  // owned domain's claims never have to clear the reviewed tier's extra
+  // sourcing bar just because it also ended up on that list.
+  const { loadClaims } = require("../claims.js");
+  global.chrome = { runtime: { getURL: (p) => p } };
+  const files = {
+    "policies/owned.json": ["example.com"],
+    "policies/reviewed.json": ["example.com"],
+    "policies/example.com.json": { allowed_third_party_domains: [], source: "a fact about my own site" },
+  };
+  global.fetch = async (url) =>
+    url in files ? { ok: true, json: async () => files[url] } : { ok: false };
+  try {
+    const loaded = await loadClaims("example.com");
+    assert.equal(loaded.tier, "owned");
   } finally {
     delete global.chrome;
     delete global.fetch;

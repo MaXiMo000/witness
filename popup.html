@@ -8,6 +8,8 @@
   body { width: 320px; margin: 0; padding: 14px; font: 13px/1.5 -apple-system, system-ui, sans-serif; color: #1a1a1a; background: #fff; }
   h1 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; }
   #domain { color: #666; margin-bottom: 8px; word-break: break-all; }
+  #tier { font-size: 11px; color: #888; margin-bottom: 6px; }
+  #tier:empty { display: none; }
   #status { padding: 8px 10px; border-radius: 4px; font-weight: 600; margin-bottom: 10px; }
   #status.pass { background: #e6f4ea; color: #1e7a34; }
   #status.fail { background: #fce8e6; color: #b3261e; }
@@ -26,6 +28,7 @@
   @media (prefers-color-scheme: dark) {
     body { color: #e8e8e8; background: #1e1e1e; }
     #domain { color: #999; }
+    #tier { color: #888; }
     #status.pass { background: #16321f; color: #6fcf8b; }
     #status.fail { background: #3a1a17; color: #ff8a80; }
     #status.unverified { background: #3a2e0f; color: #ffcc66; }
@@ -44,6 +47,7 @@
 <body>
   <h1>🔍 witness</h1>
   <div id="domain"></div>
+  <div id="tier"></div>
   <div id="status">checking…</div>
   <ul id="observed"></ul>
   <h2>Recent checks</h2>

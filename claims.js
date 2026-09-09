@@ -13,33 +13,54 @@
 const WitnessDiff =
   typeof module !== "undefined" && module.exports ? require("./diff.js") : self.WitnessDiff;
 
-/**
- * The claims for `pageDomain`, or null if there are none to trust -- either
- * no policies/<domain>.json exists, or one does but the domain is not on
- * policies/owned.json. A policy file existing is not proof of ownership;
- * only the owned list is checked in code (README.md's "Scope" section).
- */
-async function loadOwnedClaims(pageDomain) {
-  let owned = [];
+async function fetchJson(path, fallback) {
   try {
-    const res = await fetch(chrome.runtime.getURL("policies/owned.json"));
-    if (res.ok) owned = await res.json();
-  } catch {
-    // owned.json is bundled with the extension and should always load; if it
-    // somehow doesn't, isOwned([], ...) is false and every domain reads
-    // unverified -- fails closed, never a verdict for an unreviewed site.
-  }
-  if (!WitnessDiff.isOwned(owned, pageDomain)) return null;
-
-  try {
-    const res = await fetch(chrome.runtime.getURL(`policies/${pageDomain}.json`));
+    const res = await fetch(chrome.runtime.getURL(path));
     if (res.ok) return await res.json();
   } catch {
-    // no bundled claims file for this domain -- reads as unverified
+    // Bundled with the extension and should always load; if it somehow
+    // doesn't, the fallback (an empty list, or null) fails closed the
+    // same way a domain not being on either list already does.
   }
+  return fallback;
+}
+
+/**
+ * The claims for `pageDomain`, or null if there are none to trust.
+ *
+ * Two tiers, checked in order, same "policy file existing is not enough
+ * on its own" discipline for both:
+ *
+ * - `owned`: policies/owned.json -- sites you operate. The claim is a
+ *   self-declared statement of fact about your own infrastructure.
+ * - `reviewed`: policies/reviewed.json -- real, named third parties you
+ *   don't own but have carefully reviewed, per SCHEMA.md's "Filling one
+ *   in for a real, named third party". These additionally have to pass
+ *   `isValidReviewedClaims` -- a citation-shaped `source` field is
+ *   required in code, not just asked for in docs, before the claim is
+ *   ever loaded.
+ *
+ * @returns {Promise<{claims: object, tier: "owned"|"reviewed"}|null>}
+ */
+async function loadClaims(pageDomain) {
+  const owned = await fetchJson("policies/owned.json", []);
+  if (WitnessDiff.isOwned(owned, pageDomain)) {
+    const claims = await fetchJson(`policies/${pageDomain}.json`, null);
+    return claims ? { claims, tier: "owned" } : null;
+  }
+
+  const reviewed = await fetchJson("policies/reviewed.json", []);
+  if (WitnessDiff.isOwned(reviewed, pageDomain)) {
+    const claims = await fetchJson(`policies/${pageDomain}.json`, null);
+    if (claims && WitnessDiff.isValidReviewedClaims(claims)) {
+      return { claims, tier: "reviewed" };
+    }
+    return null; // present, but doesn't clear the sourcing bar -- fails closed
+  }
+
   return null;
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { loadOwnedClaims };
+  module.exports = { loadClaims };
 }
