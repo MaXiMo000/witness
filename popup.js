@@ -12,7 +12,7 @@ async function main() {
   }
 
   const stored = await chrome.storage.session.get(`tab:${tab.id}`);
-  const state = stored[`tab:${tab.id}`] || { pageDomain, domains: [] };
+  const state = stored[`tab:${tab.id}`] || { pageDomain, domains: [], cookieDomains: [], pageHeaders: [] };
 
   // A claims file bundled with the extension itself for now (policies/).
   // Fetching a domain's own claims from *itself* would defeat the point --
@@ -20,8 +20,16 @@ async function main() {
   const claims = await loadOwnedClaims(pageDomain);
 
   const thirdParty = WitnessDiff.thirdPartyDomains(pageDomain, state.domains);
-  const result = WitnessDiff.check(claims, thirdParty);
+  const cookieDomains = WitnessDiff.thirdPartyDomains(pageDomain, state.cookieDomains || []);
+  const result = WitnessDiff.check(claims, thirdParty, { cookieDomains, pageHeaders: state.pageHeaders });
   render(result, pageDomain, thirdParty);
+  renderHistory(await loadHistory(pageDomain));
+}
+
+async function loadHistory(domain) {
+  const key = `history:${WitnessDiff.stripWww(domain)}`;
+  const stored = await chrome.storage.local.get(key);
+  return stored[key] || [];
 }
 
 main().catch((err) => {
@@ -45,6 +53,22 @@ function render(result, domain, thirdParty) {
     const li = document.createElement("li");
     li.textContent = d;
     if (unexpected.has(d)) li.className = "unexpected";
+    list.appendChild(li);
+  }
+}
+
+function renderHistory(entries) {
+  const list = document.getElementById("history");
+  if (!list) return; // absent in tests that don't need it
+  list.innerHTML = "";
+  // Newest first: what changed recently matters more than the oldest entry
+  // still inside the cap.
+  for (const entry of [...entries].reverse()) {
+    const li = document.createElement("li");
+    const when = new Date(entry.ts).toLocaleString();
+    li.textContent = `${when} — ${entry.status.toUpperCase()}`;
+    li.className = entry.status;
+    li.title = entry.detail;
     list.appendChild(li);
   }
 }

@@ -1,9 +1,10 @@
 {
   "domain": "maximo000.github.io",
   "claims": {
-    "no_third_party_trackers": true
+    "no_third_party_trackers": true,
+    "no_third_party_cookies": true
   },
   "allowed_third_party_domains": ["fonts.googleapis.com", "fonts.gstatic.com"],
-  "source": "self-declared: static GitHub Pages sites (portfolio, firedrill, carabiner, invariant docs) with no analytics, no ads, only Google Fonts",
+  "source": "self-declared: static GitHub Pages sites (portfolio, firedrill, carabiner, invariant docs) with no analytics, no ads, only Google Fonts. No `headers` claim here: GitHub Pages cannot set custom response headers at all, so there is nothing to check -- see the Netlify-hosted portfolio's own README for why it isn't on this host.",
   "checked_at": "2026-09-08"
 }

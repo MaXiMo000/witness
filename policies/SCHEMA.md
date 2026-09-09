@@ -9,9 +9,13 @@ bare domain).
 {
   "domain": "example.com",
   "claims": {
-    "no_third_party_trackers": true
+    "no_third_party_trackers": true,
+    "no_third_party_cookies": true
   },
   "allowed_third_party_domains": ["fonts.gstatic.com"],
+  "headers": {
+    "content-security-policy": { "present": true }
+  },
   "source": "how you know this claim is real -- a quoted line from the privacy policy, or (for a site you own) a statement of fact",
   "checked_at": "2026-09-08"
 }
@@ -22,7 +26,18 @@ bare domain).
 - `claims.no_third_party_trackers` only changes the wording of a failure
   (quotes the site's own claim back at it) -- the allow-list is what decides
   pass/fail either way.
+- `claims.no_third_party_cookies` is a separate, stricter gate: a domain can
+  be on the allow-list (it's a legitimate font host or CDN) and still fail
+  this if it sets a cookie the allow-list doesn't say anything about
+  cookies at all.
+- `headers` checks the page's *own* top-level response, not third parties --
+  for a claim like "we set a strict CSP." Two rule shapes per header name:
+  `{"present": true}` (must be sent at all) or `{"contains": "substring"}`
+  (a loose match, since an exact-string check would break on harmless
+  directive reordering that isn't the claim being verified).
 - No file for a domain -- `unverified`, never a silent pass.
+- All three checks (traffic, cookies, headers) fail closed independently:
+  the first one that finds a discrepancy is what the popup reports.
 
 ## Filling one in for a real, named third party
 

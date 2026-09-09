@@ -17,6 +17,12 @@
   #observed li.unexpected { color: #b3261e; font-weight: 600; }
   #observed li.unexpected::after { content: " — not in allow-list"; font-weight: 400; color: #b3261e; opacity: 0.8; }
 
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: #888; margin: 14px 0 4px; }
+  #history { margin: 0; padding-left: 18px; font-size: 12px; color: #444; }
+  #history:empty::before { content: "no earlier checks recorded for this site"; padding-left: 0; color: #999; }
+  #history li.fail { color: #b3261e; }
+  #history li.pass { color: #1e7a34; }
+
   @media (prefers-color-scheme: dark) {
     body { color: #e8e8e8; background: #1e1e1e; }
     #domain { color: #999; }
@@ -27,6 +33,11 @@
     #observed:empty::before { color: #777; }
     #observed li.unexpected { color: #ff8a80; }
     #observed li.unexpected::after { color: #ff8a80; }
+    h2 { color: #888; }
+    #history { color: #bbb; }
+    #history:empty::before { color: #777; }
+    #history li.fail { color: #ff8a80; }
+    #history li.pass { color: #6fcf8b; }
   }
 </style>
 </head>
@@ -35,6 +46,8 @@
   <div id="domain"></div>
   <div id="status">checking…</div>
   <ul id="observed"></ul>
+  <h2>Recent checks</h2>
+  <ul id="history"></ul>
   <script src="diff.js"></script>
   <script src="claims.js"></script>
   <script src="popup.js"></script>

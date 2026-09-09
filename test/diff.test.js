@@ -3,7 +3,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { check, thirdPartyDomains, stripWww, isOwned } = require("../diff.js");
+const { check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned } = require("../diff.js");
 
 test("no claims file -> unverified, never a false pass or fail", () => {
   const result = check(null, ["ads.example"]);
@@ -75,6 +75,72 @@ test("loadOwnedClaims: an owned domain with a policy file returns it", async () 
     delete global.chrome;
     delete global.fetch;
   }
+});
+
+test("checkCookies: no claim -> nothing to say, even if cookies were set", () => {
+  assert.equal(checkCookies({ claims: {} }, ["ads.example"]), null);
+});
+
+test("checkCookies: claims none, none observed -> nothing to say", () => {
+  const claims = { claims: { no_third_party_cookies: true } };
+  assert.equal(checkCookies(claims, []), null);
+});
+
+test("checkCookies: claims none but a third party set one -> names it", () => {
+  const claims = { claims: { no_third_party_cookies: true } };
+  const detail = checkCookies(claims, ["www.ads.example"]);
+  assert.match(detail, /ads\.example/);
+});
+
+test("checkHeaders: no claim -> nothing to say", () => {
+  assert.equal(checkHeaders({}, [{ name: "X-Foo", value: "1" }]), null);
+});
+
+test("checkHeaders: present claim satisfied, case-insensitively", () => {
+  const claims = { headers: { "Content-Security-Policy": { present: true } } };
+  const detail = checkHeaders(claims, [{ name: "content-security-policy", value: "default-src 'none'" }]);
+  assert.equal(detail, null);
+});
+
+test("checkHeaders: present claim not satisfied -> names the header", () => {
+  const claims = { headers: { "content-security-policy": { present: true } } };
+  const detail = checkHeaders(claims, [{ name: "content-type", value: "text/html" }]);
+  assert.match(detail, /content-security-policy/);
+});
+
+test("checkHeaders: contains claim checks a substring, not an exact match", () => {
+  const claims = { headers: { "content-security-policy": { contains: "default-src 'none'" } } };
+  const ok = checkHeaders(claims, [{ name: "content-security-policy", value: "default-src 'none'; script-src 'self'" }]);
+  assert.equal(ok, null);
+  const bad = checkHeaders(claims, [{ name: "content-security-policy", value: "default-src *" }]);
+  assert.match(bad, /content-security-policy/);
+});
+
+test("check: an allow-listed domain still fails a no-cookies claim if it sets one", () => {
+  const claims = { claims: { no_third_party_cookies: true }, allowed_third_party_domains: ["cdn.example.net"] };
+  const result = check(claims, ["cdn.example.net"], { cookieDomains: ["cdn.example.net"] });
+  assert.equal(result.status, "fail");
+  assert.match(result.detail, /cdn\.example\.net/);
+});
+
+test("check: a declared header claim that the response never sent -> fail", () => {
+  const claims = { allowed_third_party_domains: [], headers: { "content-security-policy": { present: true } } };
+  const result = check(claims, [], { pageHeaders: [] });
+  assert.equal(result.status, "fail");
+  assert.match(result.detail, /content-security-policy/);
+});
+
+test("check: cookie and header claims both satisfied -> pass, same as before they existed", () => {
+  const claims = {
+    claims: { no_third_party_cookies: true },
+    allowed_third_party_domains: ["cdn.example.net"],
+    headers: { "content-security-policy": { present: true } },
+  };
+  const result = check(claims, ["cdn.example.net"], {
+    cookieDomains: [],
+    pageHeaders: [{ name: "content-security-policy", value: "default-src 'none'" }],
+  });
+  assert.equal(result.status, "pass");
 });
 
 test("loadOwnedClaims: a real policy file for an unowned domain is never returned", async () => {

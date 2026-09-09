@@ -16,6 +16,7 @@ function fakeDocument() {
     domain: { textContent: "" },
     status: { textContent: "", className: "" },
     observed: { children: [], innerHTML: "", appendChild(el) { this.children.push(el); } },
+    history: { children: [], innerHTML: "", appendChild(el) { this.children.push(el); } },
   };
   return {
     getElementById: (id) => els[id],
@@ -49,7 +50,10 @@ test("popup: a normal pass renders through the real render() path", async () => 
   const doc = await runPopup({
     chrome: {
       tabs: { query: async () => [{ id: 1, url: "https://example.com/" }] },
-      storage: { session: { get: async () => ({ "tab:1": { domains: ["cdn.example.net"] } }) } },
+      storage: {
+        session: { get: async () => ({ "tab:1": { domains: ["cdn.example.net"] } }) },
+        local: { get: async () => ({}) },
+      },
     },
     loadOwnedClaims: async () => ({ allowed_third_party_domains: ["cdn.example.net"] }),
   });
@@ -61,10 +65,45 @@ test("popup: an unanticipated throw still renders, instead of leaving \"checking
   const doc = await runPopup({
     chrome: {
       tabs: { query: async () => { throw new Error("extension context invalidated"); } },
-      storage: { session: { get: async () => ({}) } },
+      storage: { session: { get: async () => ({}) }, local: { get: async () => ({}) } },
     },
     loadOwnedClaims: async () => null,
   });
   assert.equal(doc._els.status.className, "unverified");
   assert.match(doc._els.status.textContent, /extension context invalidated/);
+});
+
+test("popup: renders recorded history, newest first", async () => {
+  const history = [
+    { ts: 1000, status: "fail", detail: "old failure" },
+    { ts: 2000, status: "pass", detail: "recovered" },
+  ];
+  const doc = await runPopup({
+    chrome: {
+      tabs: { query: async () => [{ id: 1, url: "https://example.com/" }] },
+      storage: {
+        session: { get: async () => ({ "tab:1": { domains: [] } }) },
+        local: { get: async () => ({ "history:example.com": history }) },
+      },
+    },
+    loadOwnedClaims: async () => ({ allowed_third_party_domains: [] }),
+  });
+  const rendered = doc._els.history.children;
+  assert.equal(rendered.length, 2);
+  assert.match(rendered[0].textContent, /PASS/); // newest first
+  assert.match(rendered[1].textContent, /FAIL/);
+});
+
+test("popup: no recorded history -> empty list, not an error", async () => {
+  const doc = await runPopup({
+    chrome: {
+      tabs: { query: async () => [{ id: 1, url: "https://example.com/" }] },
+      storage: {
+        session: { get: async () => ({ "tab:1": { domains: [] } }) },
+        local: { get: async () => ({}) },
+      },
+    },
+    loadOwnedClaims: async () => ({ allowed_third_party_domains: [] }),
+  });
+  assert.equal(doc._els.history.children.length, 0);
 });

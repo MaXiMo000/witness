@@ -21,18 +21,28 @@ FAIL — claims no third-party trackers, but contacted: ads.example.net
 ## How
 
 - A Manifest V3 extension watches requests made while a tab has a page
-  open (domains only — no bodies, no headers beyond the URL) and keeps a
-  running list of distinct third-party domains contacted.
+  open — no bodies are ever read — and keeps a running list of the
+  distinct third-party domains contacted, which of them set a cookie
+  (`Set-Cookie` on the response, read via `webRequest`'s non-blocking
+  `extraHeaders`, not a new permission), and the top-level page's own
+  response headers.
 - A `policies/<domain>.json` file declares what a domain is allowed to
-  contact. See `policies/SCHEMA.md`. `policies/owned.json` lists which
-  domains a policy file is actually trusted for — see Scope, below.
+  contact, plus optionally a no-third-party-cookies claim and expectations
+  about the page's own headers (e.g. "we set a CSP"). See
+  `policies/SCHEMA.md`. `policies/owned.json` lists which domains a policy
+  file is actually trusted for — see Scope, below.
 - `diff.js` — pure, dependency-free comparison logic, unit tested with
-  Node's built-in test runner — compares the two and reports the verdict.
+  Node's built-in test runner — compares the three (traffic, cookies,
+  headers) against the claims and reports one verdict.
 - `claims.js` — the fetch orchestration `background.js` and `popup.js`
   share (load `owned.json`, check it, then load the domain's policy file).
   Kept out of `diff.js` so the pass/fail logic stays pure and Node-testable;
   this needs `chrome.runtime.getURL` and `fetch`, which only exist in the
   extension itself.
+- Every verdict (pass/fail, not unverified — there's nothing to log yet)
+  is appended to `chrome.storage.local`, capped at the last 20 per domain,
+  and the popup shows them under "Recent checks" — so a site that passed
+  today and failed last week doesn't require remembering that yourself.
 
 ## Scope
 
@@ -70,12 +80,21 @@ Loaded unpacked in Chrome, confirmed a real `PASS` against
 `maximo000.github.io/carabiner/` (observed `fonts.googleapis.com` /
 `fonts.gstatic.com`, matched the declared allow-list) and a real
 `UNVERIFIED` on a site with no claims file. Toolbar badge (OK/FAIL/?) and
-dark-mode popup styling are in. The owned-list gate, the popup's top-level
-error handling, and CI were added and covered by `node --test` (13 tests,
-including two that load the real `popup.js` with fake `chrome`/`document`
-globals and check what it actually rendered) in a session that could not
-reach a real Chrome instance to re-confirm end-to-end — load-unpacked and
-click through before trusting this beyond what the tests already pin down.
+dark-mode popup styling are in.
+
+Everything added since — the owned-list gate, the popup's top-level error
+handling, persisted verdict history, and cookie/header claims — is covered
+by `node --test` (25 tests, including several that load the real
+`popup.js`/`diff.js` with fake `chrome`/`document` globals and check what
+they actually rendered or decided) but **not re-confirmed end-to-end in a
+real Chrome instance** — every session since the initial scaffold has hit a
+tooling outage reaching a real browser. The `webRequest.onHeadersReceived`
+listener in particular (`extraHeaders`, `Set-Cookie` visibility, header
+capture timing against `onCompleted`) is exactly the kind of thing that can
+look right in a unit test and still behave differently against a real
+response — load-unpacked and click through, including a site that actually
+sets a third-party cookie, before trusting this beyond what the tests
+already pin down.
 
 ## Try the logic
 
