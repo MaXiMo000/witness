@@ -30,11 +30,32 @@ function checkCookies(claims, cookieDomains) {
   return `claims no third-party cookies, but a cookie was set by: ${setters.join(", ")}`;
 }
 
+// Header names whose *value* can carry a live credential or session
+// identifier -- Set-Cookie above all, but also the Authorization family a
+// server might (unusually) echo back. checkHeaders below only ever needs
+// to know a header is *present*, or that it *contains* a claims-declared
+// substring (an HSTS/CSP-style "we set X" claim) -- checking a secret's
+// own contents was never a sane use of this feature, so the value is
+// scrubbed before it's ever held anywhere, even the ephemeral
+// chrome.storage.session copy in background.js.
+const SENSITIVE_HEADERS = new Set(["set-cookie", "authorization", "proxy-authorization", "www-authenticate"]);
+
+/**
+ * Returns `headers` with the value of any sensitive header masked, name
+ * (and casing) left alone so a `present` claim check still works.
+ */
+function redactSensitiveHeaders(headers) {
+  return (headers || []).map((h) =>
+    SENSITIVE_HEADERS.has((h.name || "").toLowerCase()) ? { name: h.name, value: "[REDACTED]" } : h,
+  );
+}
+
 /**
  * `claims.headers` checks the page's own top-level response headers, not
  * third-party requests -- e.g. a site that documents "we set a strict CSP"
- * can be held to that literally. `pageHeaders` is the raw
- * chrome.webRequest responseHeaders array (name/value pairs, any case).
+ * can be held to that literally. `pageHeaders` is the chrome.webRequest
+ * responseHeaders array (name/value pairs, any case), already passed
+ * through redactSensitiveHeaders above by the time it gets here.
  * Two rule shapes, deliberately not a full header-value grammar: `present`
  * (the header exists at all) and `contains` (a substring match) -- a full
  * CSP/HSTS parser is a lot of code for a claims file that just needs "this
@@ -130,9 +151,11 @@ function isValidReviewedClaims(claims) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned, isValidReviewedClaims,
+    redactSensitiveHeaders,
   };
 } else {
   self.WitnessDiff = {
     check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned, isValidReviewedClaims,
+    redactSensitiveHeaders,
   };
 }

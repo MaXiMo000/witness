@@ -3,8 +3,10 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned, isValidReviewedClaims } =
-  require("../diff.js");
+const {
+  check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned, isValidReviewedClaims,
+  redactSensitiveHeaders,
+} = require("../diff.js");
 
 test("no claims file -> unverified, never a false pass or fail", () => {
   const result = check(null, ["ads.example"]);
@@ -254,4 +256,31 @@ test("loadClaims: a domain on both lists reads as owned, not reviewed", async ()
     delete global.chrome;
     delete global.fetch;
   }
+});
+
+test("redactSensitiveHeaders: a Set-Cookie value is masked, name kept", () => {
+  const headers = [
+    { name: "Set-Cookie", value: "session=abc123secret; Path=/" },
+    { name: "Content-Type", value: "text/html" },
+  ];
+  const result = redactSensitiveHeaders(headers);
+  assert.equal(result[0].name, "Set-Cookie");
+  assert.equal(result[0].value, "[REDACTED]");
+  assert.equal(result[1].value, "text/html"); // unrelated header untouched
+});
+
+test("redactSensitiveHeaders: matches header names case-insensitively", () => {
+  const result = redactSensitiveHeaders([{ name: "AUTHORIZATION", value: "Bearer sk-real-token" }]);
+  assert.equal(result[0].value, "[REDACTED]");
+});
+
+test("redactSensitiveHeaders: a present-only claim still works after redaction", () => {
+  const claims = { headers: { "set-cookie": { present: true } } };
+  const redacted = redactSensitiveHeaders([{ name: "Set-Cookie", value: "session=abc123secret" }]);
+  assert.equal(checkHeaders(claims, redacted), null); // still detected as present
+});
+
+test("redactSensitiveHeaders: empty/missing input doesn't throw", () => {
+  assert.deepEqual(redactSensitiveHeaders([]), []);
+  assert.deepEqual(redactSensitiveHeaders(undefined), []);
 });

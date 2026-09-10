@@ -25,7 +25,12 @@ FAIL — claims no third-party trackers, but contacted: ads.example.net
   distinct third-party domains contacted, which of them set a cookie
   (`Set-Cookie` on the response, read via `webRequest`'s non-blocking
   `extraHeaders`, not a new permission), and the top-level page's own
-  response headers.
+  response headers. A captured header's *value* is redacted before it's
+  held anywhere (even the ephemeral, tab-close-wiped session state) if its
+  name is one that can carry a live credential or session identifier --
+  `Set-Cookie` above all (`redactSensitiveHeaders` in `diff.js`). A claim
+  can still check that such a header is *present*; checking its contents
+  was never a sane use of this feature.
 - A `policies/<domain>.json` file declares what a domain is allowed to
   contact, plus optionally a no-third-party-cookies claim and expectations
   about the page's own headers (e.g. "we set a CSP"). See
@@ -91,9 +96,9 @@ Loaded unpacked in Chrome, confirmed a real `PASS` against
 dark-mode popup styling are in.
 
 Everything added since — the owned-list gate, the popup's top-level error
-handling, persisted verdict history, cookie/header claims, and the
-reviewed-third-party tier — is covered by `node --test` (35 tests,
-including several that load the real
+handling, persisted verdict history, cookie/header claims, the
+reviewed-third-party tier, and sensitive-header redaction — is covered by
+`node --test` (39 tests, including several that load the real
 `popup.js`/`diff.js` with fake `chrome`/`document` globals and check what
 they actually rendered or decided) but **not re-confirmed end-to-end in a
 real Chrome instance** — every session since the initial scaffold has hit a

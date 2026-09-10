@@ -4,7 +4,11 @@
  * and keeps a running list of distinct domains contacted, which of them set
  * a cookie, and the top-level page's own response headers -- everything the
  * three claim types (traffic, cookies, headers) need. No request or
- * response bodies are ever read.
+ * response bodies are ever read, and a captured header's value is redacted
+ * before storage if its name is one that can carry a live credential or
+ * session identifier (Set-Cookie above all -- see redactSensitiveHeaders
+ * in diff.js), even though this state never leaves chrome.storage.session
+ * and is wiped on tab close.
  *
  * MV3 service workers are ephemeral (killed and restarted between events),
  * so per-page state lives in chrome.storage.session, not a module-level
@@ -120,7 +124,11 @@ chrome.webRequest.onHeadersReceived.addListener(
     let changed = false;
 
     if (details.type === "main_frame") {
-      state.pageHeaders = headers;
+      // Redacted before it's held anywhere, even this ephemeral,
+      // per-tab, tab-close-wiped session copy -- a Set-Cookie value is a
+      // live session identifier, not something this tool needs to see to
+      // do its job (see redactSensitiveHeaders in diff.js).
+      state.pageHeaders = WitnessDiff.redactSensitiveHeaders(headers);
       changed = true;
     }
     const setsCookie = headers.some((h) => h.name.toLowerCase() === "set-cookie");
