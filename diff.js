@@ -148,14 +148,36 @@ function isValidReviewedClaims(claims) {
   return hasLink && hasQuoteOrSubstance;
 }
 
+/**
+ * A site's own published claims (/.well-known/witness.json): nothing to
+ * trust here -- the site is only ever checked against its own words -- but
+ * the file must actually be about this site and be shaped like a claims
+ * file, or it's ignored and the site reads unverified.
+ */
+const MAX_PUBLISHED_DOMAINS = 500;
+
+function isValidPublishedClaims(claims, pageDomain) {
+  if (!claims || typeof claims !== "object" || Array.isArray(claims)) return false;
+  if (typeof claims.domain !== "string" || stripWww(claims.domain.toLowerCase()) !== stripWww(pageDomain.toLowerCase())) {
+    return false;
+  }
+  const allowed = claims.allowed_third_party_domains;
+  if (!Array.isArray(allowed) || allowed.length > MAX_PUBLISHED_DOMAINS) return false;
+  if (!allowed.every((d) => typeof d === "string" && d.length > 0 && d.length < 256)) return false;
+  for (const key of ["claims", "headers"]) {
+    if (claims[key] !== undefined && (typeof claims[key] !== "object" || Array.isArray(claims[key]))) return false;
+  }
+  return true;
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned, isValidReviewedClaims,
-    redactSensitiveHeaders,
+    isValidPublishedClaims, redactSensitiveHeaders,
   };
 } else {
   self.WitnessDiff = {
     check, checkCookies, checkHeaders, thirdPartyDomains, stripWww, isOwned, isValidReviewedClaims,
-    redactSensitiveHeaders,
+    isValidPublishedClaims, redactSensitiveHeaders,
   };
 }
