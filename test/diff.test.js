@@ -258,6 +258,89 @@ test("loadClaims: a domain on both lists reads as owned, not reviewed", async ()
   }
 });
 
+const { isValidPublishedClaims } = require("../diff.js");
+
+test("isValidPublishedClaims: a well-formed file about this site is accepted", () => {
+  const claims = { domain: "www.example.com", allowed_third_party_domains: ["cdn.example.net"],
+                   claims: { no_third_party_trackers: true } };
+  assert.equal(isValidPublishedClaims(claims, "example.com"), true);
+});
+
+test("isValidPublishedClaims: a file about some other site is refused", () => {
+  assert.equal(isValidPublishedClaims({ domain: "other.com", allowed_third_party_domains: [] }, "example.com"), false);
+});
+
+test("isValidPublishedClaims: malformed or oversized shapes are refused, not a crash", () => {
+  for (const bad of [null, [], "x", { domain: "example.com" },
+                     { domain: "example.com", allowed_third_party_domains: "cdn.net" },
+                     { domain: "example.com", allowed_third_party_domains: [42] },
+                     { domain: "example.com", allowed_third_party_domains: new Array(501).fill("a.com") },
+                     { domain: "example.com", allowed_third_party_domains: [], claims: [] }]) {
+    assert.equal(isValidPublishedClaims(bad, "example.com"), false, JSON.stringify(bad)?.slice(0, 60));
+  }
+});
+
+function withFetch(routes, fn) {
+  return async () => {
+    const { _publishedCache } = require("../claims.js");
+    _publishedCache.clear();
+    global.chrome = { runtime: { getURL: (p) => p } };
+    const seen = [];
+    global.fetch = async (url, opts) => {
+      seen.push({ url, opts });
+      if (!(url in routes)) return { ok: false };
+      const body = routes[url];
+      return { ok: true, json: async () => body, text: async () => (typeof body === "string" ? body : JSON.stringify(body)) };
+    };
+    try {
+      await fn(seen);
+    } finally {
+      delete global.chrome;
+      delete global.fetch;
+    }
+  };
+}
+
+const LISTS = { "policies/owned.json": [], "policies/reviewed.json": [] };
+const PUBLISHED = { domain: "shop.test", allowed_third_party_domains: ["fonts.gstatic.com"],
+                    claims: { no_third_party_trackers: true } };
+
+test("loadClaims: a site's own /.well-known/witness.json is used, tagged 'published'",
+  withFetch({ ...LISTS, "https://shop.test/.well-known/witness.json": PUBLISHED }, async (seen) => {
+    const { loadClaims } = require("../claims.js");
+    assert.deepEqual(await loadClaims("shop.test"), { claims: PUBLISHED, tier: "published" });
+    const call = seen.find((c) => c.url.includes(".well-known"));
+    assert.equal(call.opts.credentials, "omit");
+    assert.equal(call.opts.redirect, "error");
+  }));
+
+test("loadClaims: a published file about a different domain is ignored -> unverified",
+  withFetch({ ...LISTS, "https://shop.test/.well-known/witness.json": { ...PUBLISHED, domain: "evil.test" } },
+    async () => {
+      const { loadClaims } = require("../claims.js");
+      assert.equal(await loadClaims("shop.test"), null);
+    }));
+
+test("loadClaims: an oversized published file is ignored",
+  withFetch({ ...LISTS, "https://shop.test/.well-known/witness.json": " ".repeat(70000) }, async () => {
+    const { loadClaims } = require("../claims.js");
+    assert.equal(await loadClaims("shop.test"), null);
+  }));
+
+test("loadClaims: published claims are cached, including 'none'",
+  withFetch({ ...LISTS }, async (seen) => {
+    const { loadClaims } = require("../claims.js");
+    await loadClaims("nothing.test");
+    await loadClaims("nothing.test");
+    assert.equal(seen.filter((c) => c.url.includes(".well-known")).length, 1);
+  }));
+
+test("check: a site that publishes 'no trackers' and contacts one fails in its own words", () => {
+  const result = check(PUBLISHED, ["fonts.gstatic.com", "ads.tracker.example"]);
+  assert.equal(result.status, "fail");
+  assert.ok(result.detail.includes("ads.tracker.example"));
+});
+
 test("redactSensitiveHeaders: a Set-Cookie value is masked, name kept", () => {
   const headers = [
     { name: "Set-Cookie", value: "session=abc123secret; Path=/" },

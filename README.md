@@ -49,12 +49,36 @@ FAIL — claims no third-party trackers, but contacted: ads.example.net
   and the popup shows them under "Recent checks" — so a site that passed
   today and failed last week doesn't require remembering that yourself.
 
+## Sites can publish their own claims
+
+Any site can opt in without anyone's review: serve a claims file at
+
+    https://<your-domain>/.well-known/witness.json
+
+```json
+{
+  "domain": "example.com",
+  "claims": { "no_third_party_trackers": true },
+  "allowed_third_party_domains": ["fonts.gstatic.com", "cdn.example.net"],
+  "headers": { "content-security-policy": { "present": true } }
+}
+```
+
+and witness checks every visit against it -- labelled "published by the
+site itself". Nothing here is trusted: the site is only ever held to its
+own words. Declare every third party honestly and you pass; claim "no
+third-party trackers" and load one anyway, and the badge says so, naming
+it. The file is fetched without cookies and without following redirects
+(it has to come from the site itself), must name the domain it's served
+from, and is capped at 64 KB; anything else is ignored and the site reads
+`UNVERIFIED`. Checked at most every 10 minutes per site. Owned and reviewed
+claims (below) take precedence when both exist.
+
 ## Scope
 
 witness is a personal transparency badge, not a general web privacy
-scanner. It only ever knows about domains that have a
-`policies/<domain>.json` file, and only ever renders a verdict for one if
-that domain is also on one of two explicit lists — every other site
+scanner. It only ever knows about domains that publish their own claims (above), or
+that have a `policies/<domain>.json` file on one of two explicit lists — every other site
 (YouTube, LinkedIn, anything nobody has reviewed) correctly reads
 `UNVERIFIED`, not a bug. Broad tracker detection across arbitrary sites is
 already a solved problem (uBlock/Ghostery/Privacy Badger, built on

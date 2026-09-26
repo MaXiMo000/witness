@@ -50,6 +50,7 @@ main().catch((err) => {
 const TIER_LABEL = {
   owned: "self-declared — a site you operate",
   reviewed: "third-party claim — reviewed and sourced, not your own site",
+  published: "published by the site itself — checked against its own words",
 };
 
 function render(result, domain, thirdParty, tier) {

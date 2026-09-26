@@ -1,5 +1,10 @@
 # Claims file format
 
+The same format is used three ways: a site you operate (`owned.json`), a
+reviewed third party (`reviewed.json`), or published by a site itself at
+`/.well-known/witness.json` -- where `domain` is required and must match
+the site it's served from (`isValidPublishedClaims` in `diff.js`).
+
 One file per domain: `policies/<domain>.json`. `<domain>` is the hostname
 exactly as the browser reports it (no scheme, no path, no leading `www.` --
 `diff.js` normalizes that on the observed side, so write the file for the

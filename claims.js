@@ -58,9 +58,42 @@ async function loadClaims(pageDomain) {
     return null; // present, but doesn't clear the sourcing bar -- fails closed
   }
 
-  return null;
+  const published = await fetchPublished(pageDomain);
+  return published ? { claims: published, tier: "published" } : null;
+}
+
+// A site that publishes its own claims at /.well-known/witness.json gets
+// checked against them -- no list to be on, because nothing is trusted: a
+// site that declares its trackers honestly passes, one that claims "no
+// third-party trackers" and contacts them fails in its own words.
+const PUBLISHED_TTL_MS = 10 * 60 * 1000;
+const PUBLISHED_MAX_BYTES = 64 * 1024;
+const publishedCache = new Map(); // domain -> {at, claims}; negatives cached too
+
+async function fetchPublished(pageDomain) {
+  const hit = publishedCache.get(pageDomain);
+  if (hit && Date.now() - hit.at < PUBLISHED_TTL_MS) return hit.claims;
+  let claims = null;
+  try {
+    // No cookies, and no redirects: the file has to come from this site,
+    // not wherever it might bounce the request to.
+    const res = await fetch(`https://${pageDomain}/.well-known/witness.json`, {
+      credentials: "omit", redirect: "error", cache: "no-cache",
+    });
+    if (res.ok) {
+      const text = await res.text();
+      if (text.length <= PUBLISHED_MAX_BYTES) {
+        const parsed = JSON.parse(text);
+        if (WitnessDiff.isValidPublishedClaims(parsed, pageDomain)) claims = parsed;
+      }
+    }
+  } catch {
+    // Unreachable, not JSON, redirected: no published claims -- unverified.
+  }
+  publishedCache.set(pageDomain, { at: Date.now(), claims });
+  return claims;
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { loadClaims };
+  module.exports = { loadClaims, _publishedCache: publishedCache };
 }
